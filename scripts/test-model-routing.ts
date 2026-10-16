@@ -60,6 +60,13 @@ const assert = {
 const route = (model: string, effort?: string) => getAntigravityRequestModelId(model, effort);
 
 const routeCases: Array<[string, string | undefined, string]> = [
+  ["gemini-4-argon", undefined, "gemini-4-argon-low"],
+  ["gemini-4-argon", "off", "gemini-4-argon-low"],
+  ["gemini-4-argon", "minimal", "gemini-4-argon-low"],
+  ["gemini-4-argon", "low", "gemini-4-argon-low"],
+  ["gemini-4-argon", "medium", "gemini-4-argon-medium"],
+  ["gemini-4-argon", "high", "gemini-4-argon-high"],
+  ["gemini-4-argon", "xhigh", "gemini-4-argon-high"],
   ["gemini-3.8-flash", undefined, "gemini-3.8-flash-low"],
   ["gemini-3.8-flash", "off", "gemini-3.8-flash-low"],
   ["gemini-3.8-flash", "minimal", "gemini-3.8-flash-low"],
@@ -103,6 +110,7 @@ for (const [model, effort, expected] of routeCases) {
 
 const modelIds = new Set(ANTIGRAVITY_MODELS.map((model) => model.id));
 const expectedModels = [
+  "gemini-4-argon",
   "gemini-3.8-flash",
   "gemini-3.7-flash",
   "gemini-3.6-flash",
@@ -122,6 +130,7 @@ for (const expected of expectedModels) {
 }
 
 const expectedThinkingLevels: Record<string, string[]> = {
+  "gemini-4-argon": ["low", "medium", "high"],
   "gemini-3.8-flash": ["low", "medium", "high"],
   "gemini-3.7-flash": ["low", "medium", "high"],
   "gemini-3.6-flash": ["low", "medium", "high"],
@@ -932,6 +941,20 @@ assert.equal(reqD.request.generationConfig?.maxOutputTokens, 65535);
 
 // Case E: Gemini models send thinkingBudget (high: -1, medium: 4000, low: 1000, off: 0)
 const flash38Model = { ...model, id: "gemini-3.8-flash", maxTokens: 65536 };
+const argonModel = { ...model, id: "gemini-4-argon", maxTokens: 65536 };
+for (const [reasoning, thinkingLevel, runtime] of [
+  ["low", "LOW", "gemini-4-argon-low"],
+  ["medium", "MEDIUM", "gemini-4-argon-medium"],
+  ["high", "HIGH", "gemini-4-argon-high"],
+] as const) {
+  const request = buildRequest(argonModel, dummyContext, "test-proj", { reasoning }, runtime);
+  assert.equal(request.request.generationConfig?.thinkingConfig?.thinkingLevel, thinkingLevel);
+  assert.equal(request.request.generationConfig?.thinkingConfig?.includeThoughts, true);
+  assert.equal(request.request.generationConfig?.thinkingConfig?.thinkingBudget, undefined);
+}
+const argonOff = buildRequest(argonModel, dummyContext, "test-proj", { reasoning: "off" }, "gemini-4-argon-low");
+assert.equal(argonOff.request.generationConfig?.thinkingConfig, undefined);
+
 for (const [reasoning, thinkingBudget, runtime] of [
   ["low", 1000, "gemini-3.8-flash-low"],
   ["medium", 4000, "gemini-3.8-flash-medium"],
@@ -1430,10 +1453,10 @@ const opusCost = ANTIGRAVITY_MODELS.find((m) => m.id === "claude-opus-4-6")?.cos
 assert.equal(opusCost?.input, 15);
 assert.equal(opusCost?.output, 75);
 
-// Wire fingerprint: User-Agent format (pure agy CLI)
+// Wire fingerprint: User-Agent format (antigravity CLI 2.24.0)
 assert.equal(
   defaultUserAgent(),
-  "antigravity/cli/1.2.4 (aidev_client; os_type=linux; arch=amd64; cl=982146307; auth_method=consumer)",
+  "antigravity/cli/2.24.0 (aidev_client; os_type=linux; arch=amd64; cl=1000335682; auth_method=consumer)",
 );
 
 // Wire fingerprint: Headers hygiene & environment isolation

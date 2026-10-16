@@ -97,7 +97,8 @@ export type GeminiToolConfig = {
 
 export type ThinkingWire = {
   includeThoughts: boolean;
-  thinkingBudget: number;
+  thinkingBudget?: number;
+  thinkingLevel?: string;
 };
 
 export type GeminiGenerationConfig = {
