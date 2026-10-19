@@ -113,8 +113,9 @@ async function testRemovesAccount(): Promise<void> {
     "a remaining account was not activated",
   );
   assert(
-    (statSync(join(process.env.PI_CODING_AGENT_DIR!, "antigravity-accounts.json")).mode & 0o777) ===
-      0o600,
+    process.platform === "win32" ||
+      (statSync(join(process.env.PI_CODING_AGENT_DIR!, "antigravity-accounts.json")).mode & 0o777) ===
+        0o600,
     "account store permissions are not owner-only",
   );
 }
