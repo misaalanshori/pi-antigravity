@@ -1143,36 +1143,70 @@ function asToolCallArguments(args: Record<string, unknown> | undefined): ToolCal
   return (args ?? {}) as ToolCall["arguments"];
 }
 
-/** Default response-header deadline for streaming requests (see fetchWithHeaderDeadline). */
-const STREAM_HEADER_TIMEOUT_DEFAULT_MS = 180_000;
-/** Default mid-body stall deadline: abort when no SSE bytes arrive for this long. */
-const STREAM_STALL_TIMEOUT_DEFAULT_MS = 120_000;
+/**
+ * Standalone fallback deadlines. Inside Pi these are normally overridden by the
+ * host's `options.timeoutMs` (Pi's "HTTP idle timeout", five minutes by default),
+ * so the provider and Pi's own dispatcher share one deadline. The larger value
+ * here only applies to hosts that do not pass a timeout.
+ */
+const STREAM_HEADER_TIMEOUT_DEFAULT_MS = 600_000;
+/** Fallback mid-body stall deadline: abort when no SSE bytes arrive for this long. */
+const STREAM_STALL_TIMEOUT_DEFAULT_MS = 600_000;
+/** setTimeout's maximum delay; Pi uses it to represent a disabled idle timeout. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
-function envTimeoutMs(name: string, fallback: number): number {
+function normalizeTimeoutMs(value: number | undefined, fallback: number): number {
+  if (value === undefined || !Number.isFinite(value) || value < 0) return fallback;
+  // Pi maps a disabled HTTP idle timeout to setTimeout's maximum delay.
+  if (value === 0 || value >= MAX_TIMER_DELAY_MS) return 0;
+  return Math.floor(value);
+}
+
+function envTimeoutMs(name: string): number | undefined {
   const raw = antigravityEnv(name);
-  if (!raw || !/^\d+$/.test(raw)) return fallback;
+  if (!raw || !/^\d+$/.test(raw)) return undefined;
   const value = Number(raw);
-  return Number.isSafeInteger(value) ? value : fallback;
+  return Number.isSafeInteger(value) ? value : undefined;
+}
+
+function streamTimeoutMs(
+  name: string,
+  requestTimeoutMs: number | undefined,
+  fallback: number,
+): number {
+  const fromEnv = envTimeoutMs(name);
+  if (fromEnv !== undefined) return normalizeTimeoutMs(fromEnv, fallback);
+  return normalizeTimeoutMs(requestTimeoutMs, fallback);
 }
 
 /**
- * Streaming header deadline in milliseconds, from ANTIGRAVITY_STREAM_HEADER_TIMEOUT_MS
- * (or the legacy NOAGY_ prefix). 0 disables the deadline; invalid values fall back
- * to the default.
+ * Streaming header deadline in milliseconds. Precedence: the explicit
+ * ANTIGRAVITY_STREAM_HEADER_TIMEOUT_MS override (legacy NOAGY_ prefix honored),
+ * then the host request timeout (Pi's HTTP idle timeout), then a ten-minute
+ * fallback. 0 disables the deadline; invalid values fall through to the next
+ * source.
  */
-export function streamHeaderTimeoutMs(): number {
-  return envTimeoutMs("STREAM_HEADER_TIMEOUT_MS", STREAM_HEADER_TIMEOUT_DEFAULT_MS);
+export function streamHeaderTimeoutMs(requestTimeoutMs?: number): number {
+  return streamTimeoutMs(
+    "STREAM_HEADER_TIMEOUT_MS",
+    requestTimeoutMs,
+    STREAM_HEADER_TIMEOUT_DEFAULT_MS,
+  );
 }
 
 /**
- * Mid-body stall deadline in milliseconds, from ANTIGRAVITY_STREAM_STALL_TIMEOUT_MS
- * (legacy NOAGY_ prefix honored). 0 disables. A healthy SSE stream emits bytes
- * continuously while generating, so a silent gap this long means the connection
- * is dead even though headers arrived — abort with a named error rather than
- * hanging until an external process timeout.
+ * Mid-body stall deadline in milliseconds. Same precedence as the header
+ * deadline. A healthy SSE stream emits bytes continuously while generating, so
+ * a silent gap this long means the connection is dead even though headers
+ * arrived — abort with a named error rather than hanging until an external
+ * process timeout. 0 disables the deadline.
  */
-export function streamStallTimeoutMs(): number {
-  return envTimeoutMs("STREAM_STALL_TIMEOUT_MS", STREAM_STALL_TIMEOUT_DEFAULT_MS);
+export function streamStallTimeoutMs(requestTimeoutMs?: number): number {
+  return streamTimeoutMs(
+    "STREAM_STALL_TIMEOUT_MS",
+    requestTimeoutMs,
+    STREAM_STALL_TIMEOUT_DEFAULT_MS,
+  );
 }
 
 function stallError(stallMs: number): Error {
@@ -1522,6 +1556,10 @@ export function streamAntigravity(
   void runWithDiagnostics(async () => {
     const startTime = Date.now();
     const output = createOutput(model);
+    // Follow Pi's HTTP idle timeout when the host supplies one, so the provider's
+    // watchdog never fires earlier than Pi's own dispatcher deadline.
+    const headerTimeoutMs = streamHeaderTimeoutMs(opts.timeoutMs);
+    const stallTimeoutMs = streamStallTimeoutMs(opts.timeoutMs);
     try {
       let creds = parseApiKey(opts.apiKey);
       const triedAccessTokens = new Set<string>([creds.token]);
@@ -1587,8 +1625,8 @@ export function streamAntigravity(
                 body,
               },
               opts.signal,
-              streamHeaderTimeoutMs(),
-              streamStallTimeoutMs(),
+              headerTimeoutMs,
+              stallTimeoutMs,
             );
             setLastStatus(response.status);
             if (response.ok) break;

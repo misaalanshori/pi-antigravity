@@ -188,6 +188,8 @@ All primary environment variables start with `ANTIGRAVITY_`. The legacy `NOAGY_`
 | `ANTIGRAVITY_PROJECT_ID` | Use a specific Cloud Code Assist project ID instead of discovery or the stable account fallback. |
 | `ANTIGRAVITY_CALLBACK_HOST` | Bind OAuth callback to `127.0.0.1`, `::1`, or `localhost` only. Defaults to `127.0.0.1`. |
 | `ANTIGRAVITY_USER_AGENT` | Override the request user-agent. |
+| `ANTIGRAVITY_STREAM_HEADER_TIMEOUT_MS` | How long to wait for response headers before aborting. Defaults to Pi's HTTP idle timeout (five minutes), or ten minutes outside Pi. Set to `0` to disable this guard; Pi's own dispatcher deadline still applies. |
+| `ANTIGRAVITY_STREAM_STALL_TIMEOUT_MS` | How long a stream may go without SSE bytes before aborting. Defaults to Pi's HTTP idle timeout (five minutes), or ten minutes outside Pi. Set to `0` to disable this guard; Pi's own dispatcher deadline still applies. |
 | `ANTIGRAVITY_RUNTIME_MODEL` | Pin requests to a runtime model ID, bypassing discovered/fallback routing. |
 | `ANTIGRAVITY_CATALOG_REFRESH_INTERVAL_MS` | Override catalog refresh TTL in ms. Defaults to 4 hours (`14400000`). Set to `0` to always refresh. |
 | `ANTIGRAVITY_CLIENT_ID` | Use a custom Google OAuth client ID. |
@@ -216,6 +218,7 @@ Provider requests reuse a keep-alive connection pool when the runtime supports i
   - **Paste (no extra setup):** Run `/login antigravity`, open the shown URL and complete Google sign-in in _any_ browser. When it redirects to `http://localhost:51121/oauth-callback?…` and fails to load, copy that full URL from the address bar and paste it into the prompt Pi shows. The code is single-use and expires quickly, so paste promptly.
   - **SSH tunnel (reusable):** From the machine with the browser, run `ssh -N -L 51121:127.0.0.1:51121 <user>@<server>` and keep it open, then run `/login antigravity` on the server. The redirect to `localhost:51121` tunnels through to the local callback automatically.
 - **OAuth callback will not start:** Ensure port `51121` is free and `ANTIGRAVITY_CALLBACK_HOST` is a permitted loopback address.
+- **Long generations abort with `no response headers within …` or `stream stalled`:** These are the provider's idle watchdogs, not Google errors. They follow Pi's **HTTP idle timeout** setting (default five minutes), because the Antigravity backend can buffer output or stay silent during a long thinking phase. Raise that setting, or set `httpIdleTimeoutMs` to `0` in `~/.pi/agent/settings.json` to disable it. Pi's dispatcher enforces the same value, so changing only the `ANTIGRAVITY_STREAM_*` overrides will not extend a turn past Pi's deadline. Disabling both guards means a genuinely dead connection is only bounded by your manual abort.
 - **Model is unavailable:** Run `/antigravity.models`; availability is account- and service-dependent.
 - **Claude/GPT tool-call schema error:** Upgrade to the latest package release. The provider adapts Pi's JSON Schema tool definitions for the Cloud Code Assist custom-tool bridge.
 - **Quota or rate limit:** Run `/antigravity.usage`. A `429` response usually indicates quota or rate limiting; changing models may still draw from the same shared pool.

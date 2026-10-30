@@ -137,10 +137,38 @@ async function main(): Promise<void> {
   // 8. Partially numeric timeout settings are invalid rather than silently truncated.
   process.env.ANTIGRAVITY_STREAM_HEADER_TIMEOUT_MS = "120s";
   process.env.ANTIGRAVITY_STREAM_STALL_TIMEOUT_MS = "12.5";
-  assert(streamHeaderTimeoutMs() === 180_000, "partial header timeout must use the default");
-  assert(streamStallTimeoutMs() === 120_000, "partial stall timeout must use the default");
+  assert(
+    streamHeaderTimeoutMs(45_000) === 45_000,
+    "invalid header timeout must fall back to the host request timeout",
+  );
+  assert(
+    streamStallTimeoutMs(45_000) === 45_000,
+    "invalid stall timeout must fall back to the host request timeout",
+  );
   delete process.env.ANTIGRAVITY_STREAM_HEADER_TIMEOUT_MS;
   delete process.env.ANTIGRAVITY_STREAM_STALL_TIMEOUT_MS;
+
+  // 9. Without a host timeout, standalone defaults are ten minutes.
+  assert(streamHeaderTimeoutMs() === 600_000, "standalone header timeout must default to ten minutes");
+  assert(streamStallTimeoutMs() === 600_000, "standalone stall timeout must default to ten minutes");
+
+  // 10. Pi's HTTP idle timeout (options.timeoutMs) drives both deadlines.
+  assert(streamHeaderTimeoutMs(300_000) === 300_000, "host header timeout must be honored");
+  assert(streamStallTimeoutMs(300_000) === 300_000, "host stall timeout must be honored");
+
+  // 11. An explicit env override wins over the host timeout.
+  process.env.ANTIGRAVITY_STREAM_HEADER_TIMEOUT_MS = "900000";
+  process.env.ANTIGRAVITY_STREAM_STALL_TIMEOUT_MS = "0";
+  assert(streamHeaderTimeoutMs(300_000) === 900_000, "env header timeout must override the host");
+  assert(streamStallTimeoutMs(300_000) === 0, "env stall timeout 0 must disable the deadline");
+  delete process.env.ANTIGRAVITY_STREAM_HEADER_TIMEOUT_MS;
+  delete process.env.ANTIGRAVITY_STREAM_STALL_TIMEOUT_MS;
+
+  // 12. Pi represents a disabled HTTP idle timeout as setTimeout's maximum.
+  assert(streamHeaderTimeoutMs(2_147_483_647) === 0, "disabled host timeout must disable the header deadline");
+  assert(streamStallTimeoutMs(2_147_483_647) === 0, "disabled host timeout must disable the stall deadline");
+  assert(streamHeaderTimeoutMs(0) === 0, "zero host timeout must disable the header deadline");
+  assert(streamStallTimeoutMs(0) === 0, "zero host timeout must disable the stall deadline");
 
   console.log("test-stream-header-deadline: all assertions passed");
 }

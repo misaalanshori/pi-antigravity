@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Long generations:** Stream header and mid-body deadlines now follow Pi's HTTP idle timeout (five minutes by default) instead of fixed 180s/120s values, with a ten-minute fallback outside Pi. The Antigravity backend can buffer output or stay silent during a long thinking phase, so healthy turns are no longer cut short after two or three minutes. `ANTIGRAVITY_STREAM_HEADER_TIMEOUT_MS` and `ANTIGRAVITY_STREAM_STALL_TIMEOUT_MS` remain explicit overrides (#98).
+
 ## [0.11.0] - 2026-10-16
 
 ### Added
