@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Client fingerprint:** Updated default User-Agent from `antigravity/cli/1.5.5` (`cl=982146307`) to `antigravity/cli/1.5.8` (`cl=1012564305`) to match the current official Antigravity CLI binary.
+
 ### Fixed
 
 - **Long generations:** Stream header and mid-body deadlines honor Pi's HTTP idle timeout (`opts.timeoutMs`, five minutes by default in Pi) with a ten-minute fallback outside Pi, overriding the fixed 180s/300s defaults. `ANTIGRAVITY_STREAM_HEADER_TIMEOUT_MS` and `ANTIGRAVITY_STREAM_STALL_TIMEOUT_MS` remain explicit overrides (fork enhancement on top of #98).
