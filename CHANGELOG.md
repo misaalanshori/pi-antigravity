@@ -7,6 +7,7 @@ All notable changes to this project are documented in this file.
 ### Added
 
 - **Max thinking tier:** Added `ThinkingEffort.Max` (`"max"`) and `-max` / `(Max)` discovery grouping, fallback routing, and `thinkingConfig` budget handling for models like Claude 5.5 Max.
+- **Claude 5.5 & Gemini 4 Argon/Carbon catalog parity:** Added `128000` max output token defaults and heuristics for Claude 5.5 (`claude-opus-5-5*`, `claude-sonnet-5-5*`), `65536` / `262144` limits for Gemini 4 Argon / Carbon, `MODEL_PLACEHOLDER_M400`–`M405` / `M417`–`M419` / `M670` enums, and `carbon` extra allowlist matching in `isExtraAllowedModelId` (preserving disabled exclusion).
 
 ### Changed
 

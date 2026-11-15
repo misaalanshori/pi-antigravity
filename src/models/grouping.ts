@@ -92,7 +92,7 @@ export function extractRecommendedModelIds(agentModelSorts: unknown): Set<string
 }
 
 export function isExtraAllowedModelId(runtimeId: string): boolean {
-  return /(?:^|-)(?:hydrogen|oxygen)(?:-|$)/i.test(runtimeId);
+  return /(?:^|-)(?:hydrogen|oxygen|carbon)(?:-|$)/i.test(runtimeId);
 }
 
 export function buildAntigravityCatalog(

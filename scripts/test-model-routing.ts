@@ -876,6 +876,10 @@ assert.equal(getMaxOutputTokens("gemini-3.7-flash", "gemini-3.7-flash-tiered"), 
 assert.equal(getMaxOutputTokens("gemini-3.6-flash", "gemini-3.6-flash-low"), 65536);
 assert.equal(getMaxOutputTokens("gemini-3.1-pro", "gemini-3.1-pro-low"), 65535);
 assert.equal(getMaxOutputTokens("claude-sonnet-4-6", "claude-sonnet-4-6"), 64000);
+assert.equal(getMaxOutputTokens("claude-opus-5-5", "claude-opus-5-5-low"), 128000);
+assert.equal(getMaxOutputTokens("claude-sonnet-5-5", "claude-sonnet-5-5-high"), 128000);
+assert.equal(getMaxOutputTokens("gemini-4-argon", "gemini-4-argon-medium"), 65536);
+assert.equal(getMaxOutputTokens("gemini-4-carbon", "gemini-4-carbon-high"), 262144);
 assert.equal(getMaxOutputTokens("gpt-oss-120b", "gpt-oss-120b-medium"), 32768);
 
 // Test fallback runtime models
@@ -1974,6 +1978,35 @@ assert.equal(reqGptOss.request.labels?.used_claude, "false");
 assert.equal(reqGptOss.request.labels?.used_claude_conservative, "false");
 assert.equal(reqGptOss.request.labels?.used_non_gemini_model, "true");
 assert.equal(reqGptOss.request.labels?.model_enum, "MODEL_OPENAI_GPT_OSS_120B_MEDIUM");
+
+const reqOpus55 = buildRequest(
+  { ...claudeOpusModel, id: "claude-opus-5-5", maxTokens: 128000 },
+  dummyContext,
+  "test-proj",
+  { maxTokens: 200000 },
+  "claude-opus-5-5-low",
+);
+assert.equal(reqOpus55.request.generationConfig?.maxOutputTokens, 128000);
+assert.equal(reqOpus55.request.labels?.used_claude, "true");
+assert.equal(reqOpus55.request.labels?.model_enum, "MODEL_PLACEHOLDER_M400");
+
+const reqSonnet55 = buildRequest(
+  { ...claudeSonnetModel, id: "claude-sonnet-5-5", maxTokens: 128000 },
+  dummyContext,
+  "test-proj",
+  {},
+  "claude-sonnet-5-5-high",
+);
+assert.equal(reqSonnet55.request.labels?.model_enum, "MODEL_PLACEHOLDER_M405");
+
+const reqArgon = buildRequest(
+  { ...model, id: "gemini-4-argon", maxTokens: 65536 },
+  dummyContext,
+  "test-proj",
+  {},
+  "gemini-4-argon-medium",
+);
+assert.equal(reqArgon.request.labels?.model_enum, "MODEL_PLACEHOLDER_M418");
 
 // 3. Multi-turn step calculation and tool call request_id sequence
 const baseTime = 1700000000000;

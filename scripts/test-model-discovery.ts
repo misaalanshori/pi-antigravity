@@ -873,4 +873,26 @@ assert.equal(maxCatalog.routing["max-only-model"]?.off, "max-only-model-max");
 assert.equal(maxCatalog.routing["max-only-model"]?.routing?.max, "max-only-model-max");
 assert.equal(maxCatalog.routing["max-only-model"]?.routing?.low, "max-only-model-max");
 
+// Gemini 4 Carbon is allowlisted when selectable (preserving disabled filtering), and Claude 5.5 / Carbon get updated fallback limits
+const carbonCatalog = buildAntigravityCatalog(
+  {
+    "gemini-4-argon-low": info("Gemini 4 Argon (Low)"),
+    "gemini-4-carbon-low": info("Gemini 4 Carbon (Low)"),
+    "gemini-4-carbon-disabled": info("Gemini 4 Carbon (Disabled)", { disabled: true }),
+    "claude-opus-5-5-low": info("Claude Opus 5.5 (Low)"),
+    "claude-sonnet-5-5-high": info("Claude Sonnet 5.5 (High)"),
+  },
+  fallback,
+  [{ displayName: "Recommended", groups: [{ modelIds: ["gemini-4-argon-low"] }] }],
+);
+assert.deepEqual(
+  carbonCatalog.models.map((model) => model.id).sort(),
+  ["gemini-4-argon", "gemini-4-carbon"],
+);
+assert.equal(getMaxOutputTokens("claude-opus-5-5", "claude-opus-5-5-max"), 128000);
+assert.equal(getMaxOutputTokens("claude-sonnet-5-5", "claude-sonnet-5-5-max"), 128000);
+assert.equal(getMaxOutputTokens("claude-sonnet-5-6", "claude-sonnet-5-6-low"), 128000);
+assert.equal(getMaxOutputTokens("gemini-4-carbon", "gemini-4-carbon-low"), 262144);
+assert.equal(getMaxOutputTokens("gemini-4-argon", "gemini-4-argon-low"), 65536);
+
 console.log("model discovery: live metadata, routing, validation, persistence, and TTL passed");

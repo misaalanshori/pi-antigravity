@@ -145,9 +145,27 @@ export const RUNTIME_MAX_OUTPUT_TOKENS: Record<string, number> = {
   "gemini-3.1-pro-low": 65535,
   "gemini-3.1-pro-high": 65535,
   "gemini-pro-agent": 65535,
+  "gemini-4-argon": 65536,
+  "gemini-4-argon-low": 65536,
+  "gemini-4-argon-medium": 65536,
+  "gemini-4-argon-high": 65536,
+  "gemini-4-carbon": 262144,
+  "gemini-4-carbon-low": 262144,
+  "gemini-4-carbon-medium": 262144,
+  "gemini-4-carbon-high": 262144,
   "claude-opus-4-6": 64000,
   "claude-opus-4-6-thinking": 64000,
   "claude-sonnet-4-6": 64000,
+  "claude-opus-5-5": 128000,
+  "claude-opus-5-5-low": 128000,
+  "claude-opus-5-5-medium": 128000,
+  "claude-opus-5-5-high": 128000,
+  "claude-opus-5-5-max": 128000,
+  "claude-sonnet-5-5": 128000,
+  "claude-sonnet-5-5-low": 128000,
+  "claude-sonnet-5-5-medium": 128000,
+  "claude-sonnet-5-5-high": 128000,
+  "claude-sonnet-5-5-max": 128000,
   "gpt-oss-120b": 32768,
   "gpt-oss-120b-medium": 32768,
 };
@@ -163,8 +181,12 @@ export function getMaxOutputTokens(modelId: string, runtimeModel?: string): numb
     return RUNTIME_MAX_OUTPUT_TOKENS[modelId];
   }
   if (runtimeModel) {
+    if (runtimeModel.startsWith("claude-opus-5-") || runtimeModel.startsWith("claude-sonnet-5-")) {
+      return 128000;
+    }
     if (runtimeModel.startsWith("claude-")) return 64000;
     if (runtimeModel.startsWith("gpt-oss-")) return 32768;
+    if (runtimeModel.startsWith("gemini-4-carbon")) return 262144;
     if (runtimeModel.startsWith("gemini-3.1-pro") || runtimeModel === "gemini-pro-agent")
       return 65535;
     if (runtimeModel.startsWith("gemini-")) return 65536;
@@ -527,12 +549,25 @@ export function advertisedSiblingRuntimes(runtimeModel: string): string[] {
 export type { ThinkingWire };
 
 export const ANTIGRAVITY_MODEL_ENUM: Record<string, string> = {
+  // Gemini 4 Argon
+  "gemini-4-argon-high": "MODEL_PLACEHOLDER_M417",
+  "gemini-4-argon-medium": "MODEL_PLACEHOLDER_M418",
+  "gemini-4-argon-low": "MODEL_PLACEHOLDER_M419",
+  // Gemini 4 Carbon
+  "gemini-4-carbon-disabled": "MODEL_PLACEHOLDER_M670",
   // Gemini 4 Hydrogen
   "gemini-4-hydrogen": "MODEL_PLACEHOLDER_M527",
   "gemini-4-hydrogen-high": "MODEL_PLACEHOLDER_M525",
   "gemini-4-hydrogen-xhigh": "MODEL_PLACEHOLDER_M528",
   "gemini-4-hydrogen-medium": "MODEL_PLACEHOLDER_M526",
   "gemini-4-hydrogen-low": "MODEL_PLACEHOLDER_M527",
+  // Claude 5.5
+  "claude-opus-5-5-low": "MODEL_PLACEHOLDER_M400",
+  "claude-opus-5-5-medium": "MODEL_PLACEHOLDER_M401",
+  "claude-opus-5-5-high": "MODEL_PLACEHOLDER_M402",
+  "claude-sonnet-5-5-low": "MODEL_PLACEHOLDER_M403",
+  "claude-sonnet-5-5-medium": "MODEL_PLACEHOLDER_M404",
+  "claude-sonnet-5-5-high": "MODEL_PLACEHOLDER_M405",
   // Gemini 3.8 Flash
   "gemini-3.8-flash": "MODEL_PLACEHOLDER_M318",
   "gemini-3.8-flash-high": "MODEL_PLACEHOLDER_M318",
