@@ -44,6 +44,7 @@
     "smoke:fetch": "node scripts/run-ts.mjs scripts/smoke-web-fetch.mjs",
     "smoke:tools": "node scripts/run-ts.mjs scripts/smoke-tool-schema.ts",
     "smoke:models": "node scripts/run-ts.mjs scripts/smoke-all-models.mjs",
+    "analyze:binary": "node scripts/run-ts.mjs scripts/analyze-binary.ts",
     "audit": "yarn npm audit --environment production --recursive && yarn npm audit --severity high --all --recursive",
     "check": "yarn typecheck && yarn lint && yarn format:check && yarn security-check && yarn test && yarn audit"
   },
