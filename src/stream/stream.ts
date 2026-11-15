@@ -15,6 +15,7 @@ import * as piAi from "@earendil-works/pi-ai";
 import { failoverToNextAccount } from "../auth/accounts.js";
 import {
   antigravityHeaders,
+  defaultSystemIdentity,
   endpointCandidates,
   fetchAvailableRuntimeModel,
   formatRequestDiagnostics,
@@ -934,30 +935,126 @@ function mapToolChoiceMode(
   return GeminiToolCallingMode.Auto;
 }
 
+const GERUND_IRREGULARS: Record<string, string> = {
+  run: "running",
+  edit: "editing",
+  read: "reading",
+  write: "writing",
+  inspect: "inspecting",
+  modify: "modifying",
+  execute: "executing",
+  create: "creating",
+  debug: "debugging",
+  search: "searching",
+  build: "building",
+  test: "testing",
+  fix: "fixing",
+  analyze: "analyzing",
+  explore: "exploring",
+};
+
+function verbToGerund(verb: string): string {
+  const lower = verb.toLowerCase();
+  if (GERUND_IRREGULARS[lower]) return GERUND_IRREGULARS[lower];
+  if (lower.endsWith("ing")) return lower;
+  if (lower.endsWith("ie")) return `${lower.slice(0, -2)}ying`;
+  if (lower.endsWith("e") && !/(?:ee|ye|oe)$/.test(lower)) return `${lower.slice(0, -1)}ing`;
+  return `${lower}ing`;
+}
+
 /**
  * Neutralize system prompt phrases that trigger false 429 RESOURCE_EXHAUSTED
  * responses from the Antigravity proxy when paired with `requestType: "agent"`.
  */
 export function sanitizeSystemPrompt(text: string): string {
-  return text
-    .replace(
-      /running inside pi,\s*a coding agent harness/gi,
-      "running inside your development environment",
-    )
-    .replace(/inside pi,\s*a coding agent harness/gi, "inside your development environment")
-    .replace(
-      /(coding assistant )running inside pi(?=[.,!?;:\s]|$)(?!\.\w)/gi,
-      "$1running inside your development environment",
-    )
-    .replace(
-      /(coding agent )inside pi(?=[.,!?;:\s]|$)(?!\.\w)/gi,
-      "$1inside your development environment",
-    )
-    .replace(
-      /\bHelp users inspect files, run commands, and modify code\./gi,
-      "Assist with inspecting files, executing commands, and editing code.",
-    )
-    .replace(/\bpractical,\s*and tool-aware\./gi, "practical, and tool aware.");
+  return (
+    text
+      .replace(
+        /running inside pi,\s*a coding agent harness/gi,
+        "running inside your development environment",
+      )
+      .replace(/inside pi,\s*a coding agent harness/gi, "inside your development environment")
+      .replace(
+        /(coding assistant )running inside pi(?=[.,!?;:\s]|$)(?!\.\w)/gi,
+        "$1running inside your development environment",
+      )
+      .replace(
+        /(coding agent )inside pi(?=[.,!?;:\s]|$)(?!\.\w)/gi,
+        "$1inside your development environment",
+      )
+      .replace(
+        /\bHelp users inspect files, run commands, and modify code\./gi,
+        "Assist with inspecting files, executing commands, and editing code.",
+      )
+      // Generalized structural heuristics for future harness / agent capability phrasings:
+      .replace(
+        /\b((?:You are|Act as)\s+(?:an?\s+)?(?:[a-z]+\s+){0,2}(?:coding|software|programming|AI)\s+(?:assistant|agent))\s+(?:running\s+)?inside\s+(?!your\b)[a-z0-9_-]+(?:\s*,\s*an?\s+[^.!?\n]{1,80})?(?=[.,!?;:\s]|$)(?!\.\w)/gi,
+        "$1 running inside your development environment",
+      )
+      .replace(
+        /\bHelp\s+(?:the\s+)?users?\s+([a-z]+)\s+([^,.\n]+),\s*([a-z]+)\s+([^,.\n]+),\s*and\s+([a-z]+)\s+([^.!?\n]+)\./gi,
+        (_m, v1: string, o1: string, v2: string, o2: string, v3: string, o3: string) =>
+          `Assist with ${verbToGerund(v1)} ${o1.trim()}, ${verbToGerund(v2)} ${o2.trim()}, and ${verbToGerund(v3)} ${o3.trim()}.`,
+      )
+      .replace(/\bcoding\s+agent\s+harness\b/gi, "development environment")
+      .replace(/\btool-aware\b/gi, "tool aware")
+  );
+}
+
+/**
+ * Demote custom `systemInstruction` text into `<context>` on the first user turn and
+ * restore the binary-derived Antigravity identity header in `systemInstruction`.
+ * Returns undefined if `systemInstruction` already holds only the canonical identity.
+ */
+export function buildPromptFallbackPayload(payload: unknown): unknown {
+  if (!isRecord(payload)) return undefined;
+  const isConsumer = isRecord(payload.request);
+  const inner = isConsumer ? (payload.request as Record<string, unknown>) : payload;
+  const sysInstr = inner.systemInstruction;
+  if (!isRecord(sysInstr) || !Array.isArray(sysInstr.parts)) return undefined;
+
+  const identity = defaultSystemIdentity();
+  const sysTexts = sysInstr.parts
+    .map((part) => (isRecord(part) && typeof part.text === "string" ? part.text.trim() : ""))
+    .filter((text) => text.length > 0 && text !== identity);
+
+  if (sysTexts.length === 0) return undefined;
+
+  const contextBlock = `<context>\n${sysTexts.join("\n\n")}\n</context>`;
+  const rawContents: unknown[] = Array.isArray(inner.contents)
+    ? (inner.contents as unknown[]).slice()
+    : [];
+  let injected = false;
+  const nextContents = rawContents.map((turn) => {
+    if (!injected && isRecord(turn) && turn.role === GeminiRole.User) {
+      injected = true;
+      const existingParts: unknown[] = Array.isArray(turn.parts)
+        ? (turn.parts as unknown[]).slice()
+        : [];
+      return {
+        ...turn,
+        parts: [{ text: `${contextBlock}\n\n` }, ...existingParts],
+      };
+    }
+    return turn;
+  });
+  if (!injected) {
+    nextContents.unshift({
+      role: GeminiRole.User,
+      parts: [{ text: contextBlock }],
+    });
+  }
+
+  const nextInner: Record<string, unknown> = {
+    ...inner,
+    systemInstruction: {
+      role: GeminiRole.User,
+      parts: [{ text: identity }],
+    },
+    contents: nextContents,
+  };
+
+  return isConsumer ? { ...payload, request: nextInner } : nextInner;
 }
 
 /** Exported for unit tests. */
@@ -1786,6 +1883,35 @@ export function streamAntigravity(
       let lastText = "";
       let received = false;
       let runtimeModel = initialRuntimeModel;
+      let promptFallbackTried = false;
+
+      const prepareAttemptPayload = async (
+        targetRuntimeModel: string,
+        nonce: number,
+      ): Promise<unknown> => {
+        const attemptOptions =
+          nonce === 0 ? opts : { ...opts, sessionId: retrySessionSeed(opts.sessionId, nonce) };
+        let payload: unknown = buildRequest(
+          model,
+          context,
+          enterpriseTarget?.projectId || projectId,
+          attemptOptions,
+          targetRuntimeModel,
+        );
+        if (enterpriseTarget) {
+          payload = toEnterpriseGenerateBody(
+            payload as AntigravityGenerateRequest,
+            enterpriseTarget,
+          );
+        }
+        const rewritten = await opts.onPayload?.(payload, model);
+        return rewritten !== undefined ? rewritten : payload;
+      };
+
+      const streamUrlFor = (endpoint: string): string =>
+        enterpriseTarget
+          ? enterpriseStreamUrl(enterpriseTarget)
+          : `${endpoint}/v1internal:streamGenerateContent?alt=sse`;
 
       for (let emptyAttempt = 0; emptyAttempt <= 2; emptyAttempt++) {
         if (opts.signal?.aborted) throw new Error("Request was aborted");
@@ -1806,28 +1932,9 @@ export function streamAntigravity(
             // Every POST after the first for this turn replays under a fresh
             // upstream session/trajectory so it cannot queue behind the crashed
             // attempt's server-side generation (see retrySessionSeed).
-            const nonce = nextRequestNonce(turnKey);
-            const attemptOptions =
-              nonce === 0 ? opts : { ...opts, sessionId: retrySessionSeed(opts.sessionId, nonce) };
-            let payload: unknown = buildRequest(
-              model,
-              context,
-              enterpriseTarget?.projectId || projectId,
-              attemptOptions,
-              runtimeModel,
-            );
-            if (enterpriseTarget) {
-              payload = toEnterpriseGenerateBody(
-                payload as AntigravityGenerateRequest,
-                enterpriseTarget,
-              );
-            }
-            const rewritten = await opts.onPayload?.(payload, model);
-            if (rewritten !== undefined) payload = rewritten;
+            const payload = await prepareAttemptPayload(runtimeModel, nextRequestNonce(turnKey));
             const body = JSON.stringify(payload);
-            const url = enterpriseTarget
-              ? enterpriseStreamUrl(enterpriseTarget)
-              : `${endpoint}/v1internal:streamGenerateContent?alt=sse`;
+            const url = streamUrlFor(endpoint);
             try {
               response = await fetchWithHeaderDeadline(
                 url,
@@ -1884,6 +1991,43 @@ export function streamAntigravity(
               ) {
                 runtimeCandidates.push(dynamic.id);
                 continue;
+              }
+            }
+          }
+          if (
+            response?.status === 429 &&
+            isGenericResourceExhausted(lastText) &&
+            !promptFallbackTried &&
+            endpoints.length > 0
+          ) {
+            promptFallbackTried = true;
+            const rawFallbackPayload = await prepareAttemptPayload(
+              runtimeModel,
+              nextRequestNonce(turnKey),
+            );
+            const demotedPayload = buildPromptFallbackPayload(rawFallbackPayload);
+            const primaryFallbackEndpoint = endpoints[0];
+            if (demotedPayload && primaryFallbackEndpoint) {
+              setLastEndpoint(primaryFallbackEndpoint);
+              try {
+                const retryRes = await fetchWithHeaderDeadline(
+                  streamUrlFor(primaryFallbackEndpoint),
+                  {
+                    method: "POST",
+                    headers: requestHeaders,
+                    body: JSON.stringify(demotedPayload),
+                  },
+                  opts.signal,
+                  headerTimeoutMs,
+                  stallTimeoutMs,
+                );
+                response = retryRes;
+                setLastStatus(retryRes.status);
+                if (retryRes.ok) break;
+                lastText = await retryRes.text();
+              } catch (error) {
+                if (opts.signal?.aborted) throw error;
+                lastEndpointError = error instanceof Error ? error : new Error(String(error));
               }
             }
           }
