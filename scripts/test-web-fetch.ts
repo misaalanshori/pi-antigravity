@@ -60,10 +60,24 @@ function cutArticle(body: string, extra = "", lang = "en"): string {
 const saved = new Map(ENV_NAMES.map((name) => [name, process.env[name]]));
 for (const name of ENV_NAMES) delete process.env[name];
 process.env.ANTIGRAVITY_BASE_URL = "https://mock.googleapis.com";
-// Saved pages land in a directory this suite removes; os.tmpdir() reads TMPDIR per call.
-const previousTmp = process.env.TMPDIR;
+// Saved pages land in a directory this suite removes; os.tmpdir() reads TMPDIR on POSIX
+// and TEMP/TMP on Windows.
+const TEMP_ENV_NAMES = ["TMPDIR", "TMP", "TEMP"] as const;
+const savedTempEnv = new Map(TEMP_ENV_NAMES.map((name) => [name, process.env[name]]));
 const scratch = mkdtempSync(join(tmpdir(), "pi-url-test-"));
-process.env.TMPDIR = scratch;
+
+function setTempEnv(dir: string): void {
+  for (const name of TEMP_ENV_NAMES) process.env[name] = dir;
+}
+
+function restoreTempEnv(): void {
+  for (const [name, value] of savedTempEnv) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+}
+
+setTempEnv(scratch);
 
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
@@ -222,7 +236,9 @@ async function scenarioReadablePage(): Promise<void> {
   const saved = readFileSync(path, "utf8");
   strictAssert.ok(saved.startsWith("Page metadata"), "the file keeps the provenance header");
   strictAssert.ok(saved.endsWith(`# Test page\n\n${body}`), "the file holds the whole page");
-  strictAssert.equal(statSync(path).mode & 0o777, 0o600);
+  if (process.platform !== "win32") {
+    strictAssert.equal(statSync(path).mode & 0o777, 0o600);
+  }
   strictAssert.ok(updates.some((update) => update.includes("Reading https://example.com/page")));
 
   // A page that fits is answered whole, without a file.
@@ -618,8 +634,7 @@ async function scenarioUnconverted(): Promise<void> {
 /** A save that fails is reported in the answer; the page that was read is not lost. */
 async function scenarioSaveFailure(): Promise<void> {
   const body = "Words of the page. ".repeat(400);
-  const original = process.env.TMPDIR;
-  process.env.TMPDIR = join(scratch, "does-not-exist");
+  setTempEnv(join(scratch, "does-not-exist"));
   try {
     handler = (_body, url) =>
       url.endsWith(":rewriteUri") ? json({}) : json({ content: article(body) });
@@ -637,7 +652,7 @@ async function scenarioSaveFailure(): Promise<void> {
       "the page's own failure survives a failed save",
     );
   } finally {
-    process.env.TMPDIR = original;
+    setTempEnv(scratch);
   }
 }
 
@@ -926,8 +941,7 @@ try {
 } finally {
   globalThis.fetch = originalFetch;
   rmSync(scratch, { recursive: true, force: true });
-  if (previousTmp === undefined) delete process.env.TMPDIR;
-  else process.env.TMPDIR = previousTmp;
+  restoreTempEnv();
   for (const [name, value] of saved) {
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
