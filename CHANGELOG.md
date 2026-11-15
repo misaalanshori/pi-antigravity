@@ -8,10 +8,11 @@ All notable changes to this project are documented in this file.
 
 - **Max thinking tier:** Added `ThinkingEffort.Max` (`"max"`) and `-max` / `(Max)` discovery grouping, fallback routing, and `thinkingConfig` budget handling for models like Claude 5.5 Max.
 - **Claude 5.5 & Gemini 4 Argon/Carbon catalog parity:** Added `128000` max output token defaults and heuristics for Claude 5.5 (`claude-opus-5-5*`, `claude-sonnet-5-5*`), `65536` / `262144` limits for Gemini 4 Argon / Carbon, `MODEL_PLACEHOLDER_M400`–`M405` / `M417`–`M419` / `M670` enums, and `carbon` extra allowlist matching in `isExtraAllowedModelId` (preserving disabled exclusion).
+- **Runtime CLI heuristic self-updater (`/antigravity.refresh-binary`) & `yarn analyze:binary`:** Added pure Node.js ELF64/Go heuristic binary analysis and SHA-512 verified archive extraction (`src/binary/`). `/antigravity.refresh-binary` fetches the live CLI binary from `antigravity.google/cli/install.sh`, extracts User-Agent, endpoints, and model catalog, and persists state to `~/.pi/agent/antigravity-binary-state.json` without affecting `/antigravity.refresh`.
 
 ### Changed
 
-- **Client fingerprint:** Updated default User-Agent from `antigravity/cli/1.5.5` (`cl=982146307`) to `antigravity/cli/1.5.8` (`cl=1012564305`) to match the current official Antigravity CLI binary.
+- **Client fingerprint:** Updated default User-Agent from `antigravity/cli/1.5.5` (`cl=982146307`) to `antigravity/cli/1.5.9` (`cl=1012564305`) to match the current official Antigravity CLI binary.
 
 ### Fixed
 

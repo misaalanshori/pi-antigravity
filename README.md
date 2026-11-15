@@ -113,6 +113,7 @@ Review these permissions before approving access. If your credentials expire or 
 | `/antigravity.credits [on\|off]` | Check or toggle automatic fallback to AI credits when standard quotas are exhausted. |
 | `/antigravity.models all` | Include tab/chat models normally hidden from the model list. |
 | `/antigravity.refresh` | Force refresh the dynamic model catalog from Antigravity. |
+| `/antigravity.refresh-binary` | Fetch the latest official Antigravity CLI archive, verify SHA-512, heuristically extract User-Agent, endpoints, and models, and persist runtime overrides. |
 | `/antigravity.doctor` | Show sanitized provider diagnostics, including the endpoint, status, and resolved runtime model. |
 | `/antigravity.image <prompt>` | Generate an image via Antigravity and save it under `.pi/generated-images/`. Optional `--ratio 16:9`, `--model`, `--path`. |
 | `/antigravity.search <query>` | Search the web using Google Search Grounding via Antigravity. Optional `--thinking`, `--url <url>`. |
@@ -283,6 +284,8 @@ corepack enable
 yarn install --immutable
 yarn check
 ```
+
+To inspect the official Antigravity CLI binary offline or remotely with the heuristic ELF64/Go analyzer, run `yarn analyze:binary [path] [--remote] [--json] [--apply]`.
 
 For an optional live fetch check, run `yarn smoke:fetch` after `/login antigravity`. It exercises the registered tool on three public URLs and checks that reading a saved page needs neither network nor credentials. Missing expected page text is a failure unless explicit retrieval failures explain a degraded copy, which is an upstream-availability warning. An unobserved MDN canonical alias is also a warning; when that alias is observed, redirect provenance is checked. It uses saved Pi credentials (`PI_AUTH_PATH` can select another auth file), leaves saved pages in the temp directory, and is excluded from `yarn check` and default CI. Exit codes: 0 for successful coverage, 1 for integration failures, 2 when upstream availability limits coverage, no page passes, or no saved page can be checked.
 
