@@ -382,6 +382,7 @@ export const ANTIGRAVITY_MODELS: AntigravityModelConfig[] = [
 
 let currentModels: AntigravityModelConfig[] = ANTIGRAVITY_MODELS;
 let currentRouting: Record<string, AntigravityRouting> = { ...ANTIGRAVITY_ROUTING };
+let binaryFallbackCatalog: AntigravityCatalog | undefined;
 
 export function getCurrentAntigravityModels(): AntigravityModelConfig[] {
   return currentModels;
@@ -395,14 +396,65 @@ export function getCurrentAntigravityCatalog(): AntigravityCatalog {
   return { models: currentModels, routing: currentRouting };
 }
 
+export function getFallbackAntigravityCatalog(): AntigravityCatalog {
+  return (
+    binaryFallbackCatalog ?? {
+      models: ANTIGRAVITY_MODELS,
+      routing: { ...ANTIGRAVITY_ROUTING },
+    }
+  );
+}
+
 export function applyAntigravityCatalog(catalog: AntigravityCatalog): void {
   currentModels = catalog.models;
   currentRouting = catalog.routing;
 }
 
+/**
+ * Apply a binary-discovered catalog as the enriched fallback catalog and merge it into
+ * the active catalog when running from static defaults or newly discovered families.
+ */
+export function applyBinaryDiscoveredCatalog(catalog: AntigravityCatalog): void {
+  const mergedModelsMap = new Map<string, AntigravityModelConfig>();
+  for (const m of ANTIGRAVITY_MODELS) mergedModelsMap.set(m.id, m);
+  for (const m of catalog.models) mergedModelsMap.set(m.id, m);
+
+  const mergedRouting: Record<string, AntigravityRouting> = {
+    ...ANTIGRAVITY_ROUTING,
+    ...catalog.routing,
+  };
+  const enriched: AntigravityCatalog = {
+    models: [...mergedModelsMap.values()],
+    routing: mergedRouting,
+  };
+  binaryFallbackCatalog = enriched;
+
+  if (currentModels === ANTIGRAVITY_MODELS) {
+    applyAntigravityCatalog(enriched);
+    return;
+  }
+
+  // Merge newly discovered families that aren't in the active live catalog yet.
+  const activeMap = new Map<string, AntigravityModelConfig>();
+  for (const m of currentModels) activeMap.set(m.id, m);
+  let changed = false;
+  const nextRouting = { ...currentRouting };
+  for (const m of catalog.models) {
+    if (!activeMap.has(m.id)) {
+      activeMap.set(m.id, m);
+      if (catalog.routing[m.id]) nextRouting[m.id] = catalog.routing[m.id];
+      changed = true;
+    }
+  }
+  if (changed) {
+    applyAntigravityCatalog({ models: [...activeMap.values()], routing: nextRouting });
+  }
+}
+
 export function resetAntigravityCatalogForTests(): void {
   currentModels = ANTIGRAVITY_MODELS;
   currentRouting = { ...ANTIGRAVITY_ROUTING };
+  binaryFallbackCatalog = undefined;
 }
 
 /** Resolve public model id + thinking effort to Antigravity runtime model id. */

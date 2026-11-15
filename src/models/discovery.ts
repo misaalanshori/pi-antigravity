@@ -12,10 +12,9 @@ import { ANTIGRAVITY_API, type AntigravityModelConfig } from "../types/types.js"
 import { antigravityEnv, isRecord } from "../utils/util.js";
 import { buildAntigravityCatalog, resolvedCatalog, type AntigravityCatalog } from "./grouping.js";
 import {
-  ANTIGRAVITY_MODELS,
-  ANTIGRAVITY_ROUTING,
   applyAntigravityCatalog,
   getCurrentAntigravityCatalog,
+  getFallbackAntigravityCatalog,
   registerDiscoveredModelEnums,
   restoreDynamicModelEnums,
   snapshotDynamicModelEnums,
@@ -43,10 +42,7 @@ export function getCatalogRefreshIntervalMs(): number {
   return DEFAULT_CATALOG_REFRESH_INTERVAL_MS;
 }
 
-const fallbackCatalog = (): AntigravityCatalog => ({
-  models: ANTIGRAVITY_MODELS,
-  routing: { ...ANTIGRAVITY_ROUTING },
-});
+const fallbackCatalog = (): AntigravityCatalog => getFallbackAntigravityCatalog();
 
 /** Restore provider state supplied by Pi before checking offline mode or refresh TTL. */
 export function hydrateAntigravityCatalog(stored: unknown): number {

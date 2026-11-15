@@ -55,19 +55,67 @@ export function defaultProjectId(seed = "antigravity-default"): string {
 /** @deprecated Use defaultProjectId(seed); kept for scripts that imported the old constant. */
 export const DEFAULT_PROJECT_ID = defaultProjectId();
 
+let dynamicUserAgent: string | undefined;
+let dynamicDefaultEndpoint: string | undefined;
+let dynamicFallbackEndpoints: string[] | undefined;
+
+/** Update runtime client User-Agent and endpoint fallback list (e.g. from binary analysis). */
+export function setDynamicClientFingerprint(config: {
+  userAgent?: string;
+  defaultEndpoint?: string;
+  fallbackEndpoints?: string[];
+}): void {
+  dynamicUserAgent = config.userAgent?.trim() || undefined;
+  const safeDefault = config.defaultEndpoint
+    ? assertSafeApiBaseUrl(config.defaultEndpoint)
+    : undefined;
+  const safeFallbacks = (config.fallbackEndpoints ?? [])
+    .map((url) => assertSafeApiBaseUrl(url))
+    .filter((url, idx, arr) => arr.indexOf(url) === idx);
+  dynamicDefaultEndpoint = safeDefault || safeFallbacks[0] || undefined;
+  dynamicFallbackEndpoints =
+    safeFallbacks.length > 0
+      ? safeFallbacks
+      : safeDefault
+        ? [safeDefault, ...ENDPOINT_FALLBACKS.filter((url) => url !== safeDefault)]
+        : undefined;
+}
+
+/** Current runtime client fingerprint overrides. */
+export function getDynamicClientFingerprint(): {
+  userAgent: string;
+  defaultEndpoint: string;
+  fallbackEndpoints: string[];
+} {
+  return {
+    userAgent: dynamicUserAgent || DEFAULT_USER_AGENT,
+    defaultEndpoint: dynamicDefaultEndpoint || DEFAULT_ENDPOINT,
+    fallbackEndpoints: [...(dynamicFallbackEndpoints ?? ENDPOINT_FALLBACKS)],
+  };
+}
+
+/** Reset runtime client fingerprint overrides (used in tests). */
+export function resetDynamicClientFingerprintForTests(): void {
+  dynamicUserAgent = undefined;
+  dynamicDefaultEndpoint = undefined;
+  dynamicFallbackEndpoints = undefined;
+}
+
 export function endpointCandidates(): string[] {
   const explicit = antigravityEnv("BASE_URL")?.trim();
-  return explicit ? [assertSafeApiBaseUrl(explicit)] : ENDPOINT_FALLBACKS;
+  return explicit
+    ? [assertSafeApiBaseUrl(explicit)]
+    : (dynamicFallbackEndpoints ?? ENDPOINT_FALLBACKS);
 }
 
 // Catalog visibility is gated on this version. 1.2.4 hides Gemini 4 Argon.
-// 1.5.8 matches the current official agy CLI release (cl=1012564305).
+// 1.5.9 matches the current official agy CLI release (cl=1012564305).
 const DEFAULT_USER_AGENT =
-  "antigravity/cli/1.5.8 (aidev_client; os_type=linux; arch=amd64; cl=1012564305; auth_method=consumer)";
+  "antigravity/cli/1.5.9 (aidev_client; os_type=linux; arch=amd64; cl=1012564305; auth_method=consumer)";
 
-/** Default User-Agent matching pure Antigravity CLI wire fingerprint. */
+/** Default User-Agent matching pure Antigravity CLI wire fingerprint (with runtime binary override). */
 export function defaultUserAgent(): string {
-  return DEFAULT_USER_AGENT;
+  return dynamicUserAgent || DEFAULT_USER_AGENT;
 }
 
 /** HTTP headers for Antigravity API requests matching CLI wire traffic. */
