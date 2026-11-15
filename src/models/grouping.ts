@@ -31,6 +31,7 @@ const THINKING_SUFFIXES: Array<{ suffix: string; level: ThinkingLevel }> = [
   { suffix: "medium", level: ThinkingEffort.Medium },
   { suffix: "high", level: ThinkingEffort.High },
   { suffix: "low", level: ThinkingEffort.Low },
+  { suffix: "max", level: ThinkingEffort.Max },
 ];
 
 const DISPLAY_LEVELS: Array<{ pattern: RegExp; level: ThinkingLevel }> = [
@@ -42,6 +43,7 @@ const DISPLAY_LEVELS: Array<{ pattern: RegExp; level: ThinkingLevel }> = [
   { pattern: /\(\s*medium\s*\)/i, level: ThinkingEffort.Medium },
   { pattern: /\(\s*high\s*\)/i, level: ThinkingEffort.High },
   { pattern: /\(\s*low\s*\)/i, level: ThinkingEffort.Low },
+  { pattern: /\(\s*max\s*\)/i, level: ThinkingEffort.Max },
 ];
 
 const PI_LEVELS = [
@@ -51,7 +53,7 @@ const PI_LEVELS = [
   ThinkingEffort.Medium,
   ThinkingEffort.High,
   ThinkingEffort.Xhigh,
-  "max",
+  ThinkingEffort.Max,
 ] as const;
 
 const ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
@@ -261,7 +263,7 @@ function displayFamily(displayName: string | undefined): string | undefined {
   if (!displayName) return undefined;
   return displayName
     .replace(
-      /\s*\((?:extra\s*low|extra\s*high|x-?\s*high|low|medium|high|minimal|thinking)\)\s*$/i,
+      /\s*\((?:extra\s*low|extra\s*high|x-?\s*high|low|medium|high|minimal|max|thinking)\)\s*$/i,
       "",
     )
     .trim()
@@ -325,6 +327,7 @@ function routingFromVariants(
     variants[ThinkingEffort.Medium] ??
     variants[ThinkingEffort.High] ??
     variants[ThinkingEffort.Xhigh] ??
+    variants[ThinkingEffort.Max] ??
     unsuffixed ??
     publicId;
 
@@ -343,6 +346,7 @@ function routingFromVariants(
       ThinkingEffort.Medium,
       ThinkingEffort.High,
       ThinkingEffort.Xhigh,
+      ThinkingEffort.Max,
     ),
     routing: {
       minimal: pick(
@@ -351,6 +355,7 @@ function routingFromVariants(
         ThinkingEffort.Medium,
         ThinkingEffort.High,
         ThinkingEffort.Xhigh,
+        ThinkingEffort.Max,
       ),
       low: pick(
         ThinkingEffort.Low,
@@ -358,6 +363,7 @@ function routingFromVariants(
         ThinkingEffort.Medium,
         ThinkingEffort.High,
         ThinkingEffort.Xhigh,
+        ThinkingEffort.Max,
       ),
       medium: pick(
         ThinkingEffort.Medium,
@@ -365,6 +371,7 @@ function routingFromVariants(
         ThinkingEffort.High,
         ThinkingEffort.Minimal,
         ThinkingEffort.Xhigh,
+        ThinkingEffort.Max,
       ),
       high: pick(
         ThinkingEffort.High,
@@ -372,8 +379,17 @@ function routingFromVariants(
         ThinkingEffort.Low,
         ThinkingEffort.Minimal,
         ThinkingEffort.Xhigh,
+        ThinkingEffort.Max,
       ),
       xhigh: pick(
+        ThinkingEffort.Xhigh,
+        ThinkingEffort.High,
+        ThinkingEffort.Medium,
+        ThinkingEffort.Low,
+        ThinkingEffort.Max,
+      ),
+      max: pick(
+        ThinkingEffort.Max,
         ThinkingEffort.Xhigh,
         ThinkingEffort.High,
         ThinkingEffort.Medium,

@@ -852,4 +852,25 @@ assert.equal(
   "gemini-4-oxygen-high",
 );
 
+// Max thinking tier groups -max / (Max) variants and falls back to lower efforts when max-only
+const maxCatalog = buildAntigravityCatalog(
+  {
+    "claude-opus-5-5-low": info("Claude Opus 5.5 (Low)"),
+    "claude-opus-5-5-high": info("Claude Opus 5.5 (High)"),
+    "claude-opus-5-5-max": info("Claude Opus 5.5 (Max)"),
+    "max-only-model-max": info("Max Only Model (Max)"),
+  },
+  fallback,
+);
+const opus55 = maxCatalog.models.find((model) => model.id === "claude-opus-5-5");
+assert.ok(opus55);
+assert.equal(opus55.thinkingLevelMap?.max, "max");
+assert.equal(opus55.thinkingLevelMap?.xhigh, null);
+assert.equal(maxCatalog.routing["claude-opus-5-5"]?.routing?.max, "claude-opus-5-5-max");
+assert.equal(maxCatalog.routing["claude-opus-5-5"]?.routing?.xhigh, "claude-opus-5-5-high");
+assert.equal(maxCatalog.routing["max-only-model"]?.defaultRequestId, "max-only-model-max");
+assert.equal(maxCatalog.routing["max-only-model"]?.off, "max-only-model-max");
+assert.equal(maxCatalog.routing["max-only-model"]?.routing?.max, "max-only-model-max");
+assert.equal(maxCatalog.routing["max-only-model"]?.routing?.low, "max-only-model-max");
+
 console.log("model discovery: live metadata, routing, validation, persistence, and TTL passed");

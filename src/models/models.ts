@@ -404,10 +404,24 @@ export function getAntigravityRequestModelId(modelId: string, effort: string | u
   }
 
   const effortKey = effort as ThinkingEffort;
+  if (effortKey === ThinkingEffort.Max) {
+    return (
+      r.routing?.max ??
+      r.routing?.xhigh ??
+      r.routing?.high ??
+      r.routing?.medium ??
+      r.routing?.low ??
+      r.routing?.minimal ??
+      r.off ??
+      r.defaultRequestId ??
+      modelId
+    );
+  }
   if (effortKey === ThinkingEffort.Xhigh) {
     return (
       r.routing?.xhigh ??
       r.routing?.high ??
+      r.routing?.max ??
       r.routing?.low ??
       r.routing?.minimal ??
       r.off ??
@@ -620,27 +634,39 @@ export function getThinkingConfig(
   if (modelId.startsWith("gemini-3.5-flash") || modelId === "gemini-3-flash-agent") {
     if (!effort || effort === "off") return { includeThoughts: false, thinkingBudget: 0 };
     const thinkingBudget =
-      effort === "high" || effort === "xhigh" ? 10_000 : effort === "medium" ? 4_000 : 1_000;
+      effort === "high" || effort === "xhigh" || effort === "max"
+        ? 10_000
+        : effort === "medium"
+          ? 4_000
+          : 1_000;
     return { includeThoughts: true, thinkingBudget };
   }
   if (modelId.startsWith("gemini-3.1-pro") || modelId === "gemini-pro-agent") {
     if (!effort || effort === "off") return { includeThoughts: false, thinkingBudget: 0 };
     return {
       includeThoughts: true,
-      thinkingBudget: effort === "high" || effort === "xhigh" ? 10_001 : 1_001,
+      thinkingBudget: effort === "high" || effort === "xhigh" || effort === "max" ? 10_001 : 1_001,
     };
   }
   // Gemini 4 Argon rejects thinkingBudget 0 and any budget under 1000 (#93).
   if (modelId.includes("argon") || modelId.startsWith("gemini-4")) {
     if (!effort || effort === "off") return undefined;
     const thinkingBudget =
-      effort === "high" || effort === "xhigh" ? -1 : effort === "medium" ? 4_000 : 1_000;
+      effort === "high" || effort === "xhigh" || effort === "max"
+        ? -1
+        : effort === "medium"
+          ? 4_000
+          : 1_000;
     return { includeThoughts: true, thinkingBudget };
   }
   if (modelId.startsWith("gemini-")) {
     if (!effort || effort === "off") return { includeThoughts: false, thinkingBudget: 0 };
     const thinkingBudget =
-      effort === "high" || effort === "xhigh" ? -1 : effort === "medium" ? 4_000 : 1_000;
+      effort === "high" || effort === "xhigh" || effort === "max"
+        ? -1
+        : effort === "medium"
+          ? 4_000
+          : 1_000;
     return { includeThoughts: true, thinkingBudget };
   }
   return undefined;

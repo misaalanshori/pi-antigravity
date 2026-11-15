@@ -5,6 +5,7 @@ export const ThinkingEffort = {
   Medium: "medium",
   High: "high",
   Xhigh: "xhigh",
+  Max: "max",
 } as const;
 export type ThinkingEffort = (typeof ThinkingEffort)[keyof typeof ThinkingEffort];
 

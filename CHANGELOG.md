@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Max thinking tier:** Added `ThinkingEffort.Max` (`"max"`) and `-max` / `(Max)` discovery grouping, fallback routing, and `thinkingConfig` budget handling for models like Claude 5.5 Max.
+
 ### Changed
 
 - **Client fingerprint:** Updated default User-Agent from `antigravity/cli/1.5.5` (`cl=982146307`) to `antigravity/cli/1.5.8` (`cl=1012564305`) to match the current official Antigravity CLI binary.

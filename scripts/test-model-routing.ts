@@ -67,6 +67,7 @@ const routeCases: Array<[string, string | undefined, string]> = [
   ["gemini-3.8-flash", "medium", "gemini-3.8-flash-medium"],
   ["gemini-3.8-flash", "high", "gemini-3.8-flash-high"],
   ["gemini-3.8-flash", "xhigh", "gemini-3.8-flash-high"],
+  ["gemini-3.8-flash", "max", "gemini-3.8-flash-high"],
   ["gemini-3.7-flash", undefined, "gemini-3.7-flash-low"],
   ["gemini-3.7-flash", "off", "gemini-3.7-flash-low"],
   ["gemini-3.7-flash", "minimal", "gemini-3.7-flash-low"],
@@ -939,6 +940,7 @@ for (const [reasoning, thinkingBudget, runtime] of [
   ["low", 1000, "gemini-3.8-flash-low"],
   ["medium", 4000, "gemini-3.8-flash-medium"],
   ["high", -1, "gemini-3.8-flash-high"],
+  ["max", -1, "gemini-3.8-flash-high"],
 ] as const) {
   const request = buildRequest(flash38Model, dummyContext, "test-proj", { reasoning }, runtime);
   assert.equal(request.request.generationConfig?.thinkingConfig?.thinkingBudget, thinkingBudget);
