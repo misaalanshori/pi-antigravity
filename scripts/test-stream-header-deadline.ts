@@ -73,7 +73,7 @@ async function main(): Promise<void> {
     await fetchWithHeaderDeadline("https://x", {}, undefined, 40, 0, hangForever);
     throw new Error("expected the tarpit fetch to reject");
   } catch (error) {
-    sawTarpitError = error instanceof Error && /no response headers within 40ms/.test(error.message);
+    sawTarpitError = error instanceof Error && /no response headers within 40ms.*timed out/.test(error.message);
   }
   assert(sawTarpitError, "tarpit fetch should fail with the named header-deadline error");
 
@@ -104,7 +104,7 @@ async function main(): Promise<void> {
     await stalled.text();
     throw new Error("expected the stalled body to reject");
   } catch (error) {
-    sawStallError = error instanceof Error && /no data for 40ms/.test(error.message);
+    sawStallError = error instanceof Error && /no data for 40ms.*timed out/.test(error.message);
   }
   assert(sawStallError, `silent body should abort with the named stall error (got: ${sawStallError})`);
 
