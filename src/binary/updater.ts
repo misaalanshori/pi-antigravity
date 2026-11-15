@@ -66,6 +66,7 @@ export type PersistedBinaryState = {
   cl?: string;
   goVersion?: string;
   userAgent: string;
+  systemIdentity?: string;
   defaultEndpoint: string;
   fallbackEndpoints: string[];
   allEndpoints: string[];
@@ -716,6 +717,7 @@ function buildPersistedState(
     cl: analysis.cl,
     goVersion: analysis.goVersion,
     userAgent: analysis.userAgent,
+    ...(analysis.systemIdentity ? { systemIdentity: analysis.systemIdentity } : {}),
     defaultEndpoint: analysis.defaultEndpoint,
     fallbackEndpoints: analysis.fallbackEndpoints,
     allEndpoints: analysis.allEndpoints,
@@ -837,6 +839,9 @@ export function loadPersistedBinaryState(
     cl: typeof parsed.cl === "string" ? parsed.cl : undefined,
     goVersion: typeof parsed.goVersion === "string" ? parsed.goVersion : undefined,
     userAgent: parsed.userAgent,
+    ...(typeof parsed.systemIdentity === "string" && parsed.systemIdentity.trim().length > 0
+      ? { systemIdentity: parsed.systemIdentity.trim() }
+      : {}),
     defaultEndpoint: safeDefaultEndpoint,
     fallbackEndpoints: safeFallbacks.length > 0 ? safeFallbacks : [...ENDPOINT_FALLBACKS],
     allEndpoints: safeAll.length > 0 ? safeAll : [safeDefaultEndpoint, ...safeFallbacks],
@@ -856,6 +861,7 @@ export function applyBinaryAnalysis(
 ): PersistedBinaryState {
   setDynamicClientFingerprint({
     userAgent: analysis.userAgent,
+    ...(analysis.systemIdentity ? { systemIdentity: analysis.systemIdentity } : {}),
     defaultEndpoint: analysis.defaultEndpoint,
     fallbackEndpoints: analysis.fallbackEndpoints,
   });
@@ -877,6 +883,7 @@ export function hydratePersistedBinaryState(
 
   setDynamicClientFingerprint({
     userAgent: persisted.userAgent,
+    ...(persisted.systemIdentity ? { systemIdentity: persisted.systemIdentity } : {}),
     defaultEndpoint: persisted.defaultEndpoint,
     fallbackEndpoints: persisted.fallbackEndpoints,
   });

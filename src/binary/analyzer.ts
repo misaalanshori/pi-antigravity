@@ -59,6 +59,7 @@ export type BinaryAnalysisResult = {
   cl?: string;
   goVersion?: string;
   userAgent: string;
+  systemIdentity?: string;
   defaultEndpoint: string;
   fallbackEndpoints: string[];
   allEndpoints: string[];
@@ -595,6 +596,53 @@ function buildCatalogFromDiscovered(
   return buildAntigravityCatalog(rawModels, fallback);
 }
 
+function renderIdentityTemplate(raw: string): string | undefined {
+  let rendered = raw.replace(/\{\{-?\s*\/\*[\s\S]*?\*\/\s*-?\}\}/g, "");
+  const innerIfPattern =
+    /\{\{-?\s*if\s+([^}]+?)\s*-?\}\}((?:(?!\{\{-?\s*(?:if\b|else\b|end\b)).)*?)(?:\{\{-?\s*else\s*-?\}\}((?:(?!\{\{-?\s*(?:if\b|else\b|end\b)).)*?))?\{\{-?\s*end\s*-?\}\}/gs;
+  for (let pass = 0; pass < 8; pass++) {
+    const next = rendered.replace(
+      innerIfPattern,
+      (_full, _cond: string, _thenBranch: string, elseBranch?: string) => elseBranch ?? "",
+    );
+    if (next === rendered) break;
+    rendered = next;
+  }
+  if (/\{\{|\}\}/.test(rendered)) return undefined;
+  const normalized = rendered
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .join("\n");
+  return normalized.includes("You are Antigravity") ? normalized : undefined;
+}
+
+function extractSystemIdentity(roStr: string): string | undefined {
+  const startMarker = "LINT.IfChange(antigravity_identity)";
+  const startIdx = roStr.indexOf(startMarker);
+  if (startIdx !== -1) {
+    const afterStart = roStr.slice(startIdx + startMarker.length, startIdx + 4096);
+    const bodyStart = afterStart.indexOf("}}");
+    const endMarkerIdx = afterStart.indexOf("ThenChange(");
+    const slice = afterStart.slice(
+      bodyStart !== -1 && bodyStart < 32 ? bodyStart + 2 : 0,
+      endMarkerIdx !== -1 ? Math.max(0, endMarkerIdx - 12) : afterStart.length,
+    );
+    const resolved = renderIdentityTemplate(slice);
+    if (resolved) return resolved;
+  }
+
+  const fallbackMatch = roStr.match(
+    /You are Antigravity,\s*a powerful agentic AI[\s\S]{40,600}?<USER_REQUEST>\s*tags\./,
+  )?.[0];
+  if (!fallbackMatch || /\{\{|\}\}/.test(fallbackMatch)) return undefined;
+  return fallbackMatch
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .join("\n");
+}
+
 /** Run heuristic extraction over parsed ELF64 sections. */
 export function analyzeAntigravityBinary(
   elfSections: ElfSectionMap,
@@ -604,6 +652,7 @@ export function analyzeAntigravityBinary(
   const { cl, goVersion } = extractBuildInfo(elfSections.sections);
   const version = extractBinaryVersion(elfSections.sections, roStr, options?.manifestVersion);
   const userAgent = extractUserAgent(version, cl, roStr);
+  const systemIdentity = extractSystemIdentity(roStr);
   const { defaultEndpoint, fallbackEndpoints, allEndpoints } = extractEndpoints(roStr);
   const { runtimeModelIds, discoveredModels, modelEnums } = extractModelsHeuristic(
     elfSections.sections,
@@ -616,6 +665,7 @@ export function analyzeAntigravityBinary(
     cl,
     goVersion,
     userAgent,
+    ...(systemIdentity ? { systemIdentity } : {}),
     defaultEndpoint,
     fallbackEndpoints,
     allEndpoints,

@@ -55,17 +55,25 @@ export function defaultProjectId(seed = "antigravity-default"): string {
 /** @deprecated Use defaultProjectId(seed); kept for scripts that imported the old constant. */
 export const DEFAULT_PROJECT_ID = defaultProjectId();
 
+export const DEFAULT_SYSTEM_IDENTITY =
+  "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.\n" +
+  "You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.\n" +
+  "The USER will send you requests, which you must always prioritize addressing. User requests are enclosed within <USER_REQUEST> tags.";
+
 let dynamicUserAgent: string | undefined;
 let dynamicDefaultEndpoint: string | undefined;
 let dynamicFallbackEndpoints: string[] | undefined;
+let dynamicSystemIdentity: string | undefined;
 
-/** Update runtime client User-Agent and endpoint fallback list (e.g. from binary analysis). */
+/** Update runtime client User-Agent, system identity, and endpoint fallback list. */
 export function setDynamicClientFingerprint(config: {
   userAgent?: string;
+  systemIdentity?: string;
   defaultEndpoint?: string;
   fallbackEndpoints?: string[];
 }): void {
   dynamicUserAgent = config.userAgent?.trim() || undefined;
+  dynamicSystemIdentity = config.systemIdentity?.trim() || undefined;
   const safeDefault = config.defaultEndpoint
     ? assertSafeApiBaseUrl(config.defaultEndpoint)
     : undefined;
@@ -84,11 +92,13 @@ export function setDynamicClientFingerprint(config: {
 /** Current runtime client fingerprint overrides. */
 export function getDynamicClientFingerprint(): {
   userAgent: string;
+  systemIdentity: string;
   defaultEndpoint: string;
   fallbackEndpoints: string[];
 } {
   return {
     userAgent: dynamicUserAgent || DEFAULT_USER_AGENT,
+    systemIdentity: dynamicSystemIdentity || DEFAULT_SYSTEM_IDENTITY,
     defaultEndpoint: dynamicDefaultEndpoint || DEFAULT_ENDPOINT,
     fallbackEndpoints: [...(dynamicFallbackEndpoints ?? ENDPOINT_FALLBACKS)],
   };
@@ -97,6 +107,7 @@ export function getDynamicClientFingerprint(): {
 /** Reset runtime client fingerprint overrides (used in tests). */
 export function resetDynamicClientFingerprintForTests(): void {
   dynamicUserAgent = undefined;
+  dynamicSystemIdentity = undefined;
   dynamicDefaultEndpoint = undefined;
   dynamicFallbackEndpoints = undefined;
 }
@@ -116,6 +127,11 @@ const DEFAULT_USER_AGENT =
 /** Default User-Agent matching pure Antigravity CLI wire fingerprint (with runtime binary override). */
 export function defaultUserAgent(): string {
   return dynamicUserAgent || DEFAULT_USER_AGENT;
+}
+
+/** Default Antigravity system identity string accepted by the proxy policy filter. */
+export function defaultSystemIdentity(): string {
+  return dynamicSystemIdentity || DEFAULT_SYSTEM_IDENTITY;
 }
 
 /** HTTP headers for Antigravity API requests matching CLI wire traffic. */
