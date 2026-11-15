@@ -15,6 +15,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- **Pi 1.5.x system prompt 429 guard:** Extended `sanitizeSystemPrompt` to also neutralize `"Help users inspect files, run commands, and modify code."` so the combined default Pi harness preamble does not trigger false HTTP 429 `RESOURCE_EXHAUSTED` responses from the Antigravity proxy.
 - **Long generations:** Stream header and mid-body deadlines honor Pi's HTTP idle timeout (`opts.timeoutMs`, five minutes by default in Pi) with a ten-minute fallback outside Pi, overriding the fixed 180s/300s defaults. `ANTIGRAVITY_STREAM_HEADER_TIMEOUT_MS` and `ANTIGRAVITY_STREAM_STALL_TIMEOUT_MS` remain explicit overrides (fork enhancement on top of #98).
 
 ## [0.14.0] - 2026-11-14

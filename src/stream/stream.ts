@@ -953,6 +953,10 @@ export function sanitizeSystemPrompt(text: string): string {
       /(coding agent )inside pi(?=[.,!?;:\s]|$)(?!\.\w)/gi,
       "$1inside your development environment",
     )
+    .replace(
+      /\bHelp users inspect files, run commands, and modify code\./gi,
+      "Assist with inspecting files, executing commands, and editing code.",
+    )
     .replace(/\bpractical,\s*and tool-aware\./gi, "practical, and tool aware.");
 }
 

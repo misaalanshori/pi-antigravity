@@ -1532,7 +1532,7 @@ const defaultPiHarnessPrompt = buildRequest(
 );
 assert.equal(
   defaultPiHarnessPrompt.request.systemInstruction.parts[0]?.text,
-  "You are a coding assistant running inside your development environment. Help users inspect files, run commands, and modify code.",
+  "You are a coding assistant running inside your development environment. Assist with inspecting files, executing commands, and editing code.",
 );
 
 const shortPiPrompt = buildRequest(
