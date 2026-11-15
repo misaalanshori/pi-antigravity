@@ -18,7 +18,7 @@ import {
   removeAccount,
   updateRememberedAccount,
 } from "./auth/index.js";
-import { DEFAULT_ENDPOINT } from "./client/index.js";
+import { DEFAULT_ENDPOINT, defaultUserAgent } from "./client/index.js";
 import { getLastDiagnostics, runWithDiagnostics } from "./diagnostics/index.js";
 import { generateAntigravityImage, parseImageCommandArgs } from "./image/index.js";
 import { executeAntigravitySearch, parseSearchCommandArgs } from "./search/index.js";
@@ -60,6 +60,11 @@ import {
   maskEmail,
 } from "./utils/index.js";
 import { describeEnterpriseRouting } from "./client/enterprise.js";
+import {
+  getActiveBinaryState,
+  hydratePersistedBinaryState,
+  refreshFromRemoteBinary,
+} from "./binary/index.js";
 
 /**
  * Pi's interactive `notify` writes into the chat transcript. `console.log` in that
@@ -157,6 +162,11 @@ function registerCompatApiProvider(): void {
 
 export default function (pi: ExtensionAPI): void {
   registerCompatApiProvider();
+  try {
+    hydratePersistedBinaryState();
+  } catch {
+    // Corrupt or unreadable persisted binary state must never block extension load.
+  }
 
   // Print and RPC modes do not refresh catalogs before resolving --model. Refresh on
   // session start so a stale 1.2.x cache is replaced before the prompt, and so the next
@@ -379,10 +389,64 @@ export default function (pi: ExtensionAPI): void {
     },
   });
 
+  pi.registerCommand("antigravity.refresh-binary", {
+    description:
+      "Download latest Antigravity CLI binary and heuristically refresh client fingerprint and model catalog",
+    handler: async (_args, ctx) => {
+      if (ctx.hasUI) {
+        ctx.ui.notify(
+          "Fetching latest Antigravity CLI binary and running heuristic analysis…",
+          "info",
+        );
+      }
+      try {
+        const { state } = await refreshFromRemoteBinary({
+          onProgress: (stage) => {
+            if (ctx.hasUI) ctx.ui.notify(stage, "info");
+          },
+        });
+
+        const apiKey = await resolveApiKeyFromContext(ctx);
+        if (apiKey) {
+          try {
+            if (typeof ctx.modelRegistry?.refresh === "function") {
+              await ctx.modelRegistry.refresh({
+                force: true,
+                providers: [PROVIDER_ID],
+              });
+            } else {
+              const discovered = await discoverAntigravityModels(apiKey);
+              const next = resolvedCatalog(discovered, getCurrentAntigravityCatalog());
+              if (discovered.models.length > 0) {
+                applyAntigravityCatalog(next);
+              }
+            }
+          } catch {
+            // Non-fatal: binary state is already persisted and applied to fallback catalog.
+          }
+        }
+
+        const catalog = getCurrentAntigravityCatalog();
+        const lines = [
+          `Antigravity binary refreshed (${state.version}${state.cl ? `, cl=${state.cl}` : ""})`,
+          `userAgent=${state.userAgent}`,
+          `defaultEndpoint=${state.defaultEndpoint}`,
+          `binaryRuntimeModels=${state.runtimeModelIds.length}`,
+          `activePublicModels=${catalog.models.length} (${catalog.models.map((m) => m.id).join(", ")})`,
+        ];
+        emitCommandOutput(ctx, lines.join("\n"), "info");
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        emitCommandOutput(ctx, `Antigravity binary refresh failed: ${redactSecrets(msg)}`, "error");
+      }
+    },
+  });
+
   pi.registerCommand("antigravity.doctor", {
     description: "Show sanitized Antigravity provider diagnostics",
     handler: async (_args, ctx) => {
       const d = getLastDiagnostics();
+      const binaryState = getActiveBinaryState();
       const accounts = listAccounts();
       const active = accounts.find((account) => account.active);
       const activeLabel = active
@@ -391,6 +455,8 @@ export default function (pi: ExtensionAPI): void {
         : "none";
       const lines = [
         `provider=${PROVIDER_ID}`,
+        `userAgent=${defaultUserAgent()}`,
+        `binaryState=${binaryState ? `${binaryState.version} (cl=${binaryState.cl || "unknown"})` : "built-in"}`,
         `lastResolvedRuntimeModel=${d.resolvedRuntimeModel || "none"}`,
         `availableModels=${d.availableModels || "none"}`,
         `matchedModel=${d.matchedModelDebug || "none"}`,
@@ -407,7 +473,7 @@ export default function (pi: ExtensionAPI): void {
         `lastError=${d.error ? redactSecrets(d.error) : "none"}`,
         "transport=native-streamSimple",
         "runtimeCli=not-used",
-        "commands=/antigravity.usage /antigravity.models /antigravity.accounts /antigravity.credits /antigravity.refresh /antigravity.doctor /antigravity.image /antigravity.search /antigravity.fetch",
+        "commands=/antigravity.usage /antigravity.models /antigravity.accounts /antigravity.credits /antigravity.refresh /antigravity.refresh-binary /antigravity.doctor /antigravity.image /antigravity.search /antigravity.fetch",
       ];
       emitCommandOutput(ctx, `Antigravity doctor\n${lines.join("\n")}`);
     },
