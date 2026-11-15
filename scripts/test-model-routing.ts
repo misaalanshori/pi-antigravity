@@ -9,6 +9,7 @@ import {
 import {
   antigravityHeaders,
   defaultProjectId,
+  defaultSystemIdentity,
   defaultUserAgent,
   stableProjectId,
 } from "../src/client/index.js";
@@ -21,11 +22,13 @@ import {
   getFallbackRuntimeModel,
 } from "../src/models/index.js";
 import {
+  buildPromptFallbackPayload,
   buildRequest,
   convertMessages,
   convertTools,
   friendlyAntigravityError,
   mapStopReason,
+  sanitizeSystemPrompt,
 } from "../src/stream/index.js";
 import {
   antigravityRequestEnvelope,
@@ -1596,6 +1599,47 @@ assert.ok(
     "practical, and tool aware.",
   ),
 );
+
+// Generalized structural heuristics neutralize unseen harness/capability preambles without breaking code references.
+assert.equal(
+  sanitizeSystemPrompt(
+    "You are a helpful software agent running inside custom-cli, an autonomous runner. Help users build apps, create scripts, and debug code.",
+  ),
+  "You are a helpful software agent running inside your development environment. Assist with building apps, creating scripts, and debugging code.",
+);
+assert.equal(
+  sanitizeSystemPrompt("Keep files running inside pi.js untouched."),
+  "Keep files running inside pi.js untouched.",
+);
+
+// Consumer and enterprise fallback demotion promotes binary-derived identity and keeps instructions in <context>.
+const consumerFallback = buildPromptFallbackPayload({
+  project: "p1",
+  model: "gemini-3.8-flash-low",
+  request: {
+    contents: [{ role: "user", parts: [{ text: "hello" }] }],
+    systemInstruction: { role: "user", parts: [{ text: "Custom blocked preamble" }] },
+  },
+}) as {
+  request: {
+    contents: Array<{ role: string; parts: Array<{ text: string }> }>;
+    systemInstruction: { parts: Array<{ text: string }> };
+  };
+};
+assert.equal(consumerFallback.request.systemInstruction.parts[0]?.text, defaultSystemIdentity());
+assert.match(consumerFallback.request.contents[0]?.parts[0]?.text ?? "", /<context>\nCustom blocked preamble\n<\/context>/);
+assert.equal(buildPromptFallbackPayload(consumerFallback), undefined);
+
+const enterpriseFallback = buildPromptFallbackPayload({
+  contents: [{ role: "user", parts: [{ text: "hello" }] }],
+  systemInstruction: { role: "user", parts: [{ text: "Enterprise blocked prompt" }] },
+  aicode: { experience: "gemini-3.8-flash-low" },
+}) as {
+  contents: Array<{ role: string; parts: Array<{ text: string }> }>;
+  systemInstruction: { parts: Array<{ text: string }> };
+};
+assert.equal(enterpriseFallback.systemInstruction.parts[0]?.text, defaultSystemIdentity());
+assert.match(enterpriseFallback.contents[0]?.parts[0]?.text ?? "", /Enterprise blocked prompt/);
 
 // Skill-only turns are injected instructions, not user prompts. The request remains
 // valid without inventing a user message, and the Skill is preserved as system context.

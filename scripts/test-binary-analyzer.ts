@@ -15,7 +15,11 @@ import {
   refreshFromRemoteBinary,
   resetBinaryUpdaterStateForTests,
 } from "../src/binary/index.js";
-import { defaultUserAgent, endpointCandidates } from "../src/client/index.js";
+import {
+  defaultSystemIdentity,
+  defaultUserAgent,
+  endpointCandidates,
+} from "../src/client/index.js";
 import {
   getCurrentAntigravityCatalog,
   resetAntigravityCatalogForTests,
@@ -43,6 +47,9 @@ function buildSyntheticElf64(opts: {
     pushRo(ep);
   }
   pushRo("aidev_client");
+  pushRo(
+    '{{- /* LINT.IfChange(antigravity_identity) */ -}}\n{{if .ExperimentEnabled "generic-system-prompt"}}You are Antigravity, general.{{else}}You are Antigravity, synthetic binary test identity.{{end}}\nThe USER will send you requests, which you must always prioritize addressing. User requests are enclosed within <USER_REQUEST> tags.\n{{- /* LINT.ThenChange(//depot/abuse.pi:antigravity_identity) */ -}}',
+  );
 
   const idDescs = opts.runtimeIds.map((id) => pushRo(id));
   const pairDescs = opts.displayPairs.map((pair) => ({
@@ -354,6 +361,10 @@ curl -fsSL https://storage.googleapis.com/antigravity-public/antigravity-cli/1.6
     directAnalysis.discoveredModels["claude-opus-5-5-high"]?.modelEnum,
     "MODEL_PLACEHOLDER_M402",
   );
+  assert.equal(
+    directAnalysis.systemIdentity,
+    "You are Antigravity, synthetic binary test identity.\nThe USER will send you requests, which you must always prioritize addressing. User requests are enclosed within <USER_REQUEST> tags.",
+  );
   console.log("synthetic ELF64 heuristic analyzer checks passed");
 
   const tarGzBuf = buildSyntheticTarGz([
@@ -457,6 +468,11 @@ curl -fsSL https://storage.googleapis.com/antigravity-public/antigravity-cli/1.6
     assert.ok(hydrated);
     assert.equal(hydrated.version, "1.6.2");
     assert.equal(
+      hydrated.systemIdentity,
+      "You are Antigravity, synthetic binary test identity.\nThe USER will send you requests, which you must always prioritize addressing. User requests are enclosed within <USER_REQUEST> tags.",
+    );
+    assert.equal(defaultSystemIdentity(), hydrated.systemIdentity);
+    assert.equal(
       defaultUserAgent(),
       "antigravity/cli/1.6.2 (aidev_client; os_type=linux; arch=amd64; cl=999888777; auth_method=consumer)",
     );
@@ -486,6 +502,11 @@ curl -fsSL https://storage.googleapis.com/antigravity-public/antigravity-cli/1.6
     assert.equal(
       liveRe.discoveredModels["claude-opus-5-5-max"]?.displayName,
       "Claude Opus 5.5 (Max)",
+    );
+    assert.ok(
+      liveRe.systemIdentity?.includes(
+        "You are Antigravity, a powerful agentic AI coding assistant",
+      ),
     );
     console.log("local ./re/antigravity live heuristic checks passed");
   }

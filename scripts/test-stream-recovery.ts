@@ -34,6 +34,49 @@ try {
   const aborted = await streamAntigravity(model, { messages: [] }, { ...options, signal: controller.signal }).result();
   assert.equal(aborted.stopReason, "aborted");
   assert.ok(abortCalls <= 1, "caller cancellation never falls through endpoints");
+
+  // Generic 429 caused by a custom systemInstruction recovers automatically by
+  // promoting the official Antigravity identity to systemInstruction and preserving
+  // the custom instructions in <context> on the first user turn.
+  const promptBodies: Array<{
+    request: {
+      contents?: Array<{ role?: string; parts?: Array<{ text?: string }> }>;
+      systemInstruction?: { parts?: Array<{ text?: string }> };
+    };
+  }> = [];
+  globalThis.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body)) as (typeof promptBodies)[number];
+    promptBodies.push(body);
+    const sysText = body.request.systemInstruction?.parts?.map((p) => p.text ?? "").join("\n") ?? "";
+    if (!sysText.includes("You are Antigravity")) {
+      return new Response(
+        JSON.stringify({
+          error: { message: "Resource has been exhausted (e.g. check quota).", status: "RESOURCE_EXHAUSTED" },
+        }),
+        { status: 429 },
+      );
+    }
+    return new Response(
+      'data: {"response":{"candidates":[{"content":{"parts":[{"text":"recovered"}]},"finishReason":"STOP"}]}}\n\ndata: [DONE]\n\n',
+    );
+  }) as typeof fetch;
+  const recovered = await streamAntigravity(
+    model,
+    {
+      systemPrompt: "Strict custom harness instructions.",
+      messages: [{ role: "user", content: "Ping", timestamp: 1 }],
+    },
+    options,
+  ).result();
+  assert.equal(recovered.stopReason, "stop", recovered.errorMessage);
+  assert.ok(promptBodies.length >= 2, "expected initial attempt + identity fallback retry");
+  const lastBody = promptBodies[promptBodies.length - 1]!;
+  assert.ok(
+    lastBody.request.systemInstruction?.parts?.[0]?.text?.includes("You are Antigravity"),
+  );
+  assert.ok(
+    lastBody.request.contents?.[0]?.parts?.[0]?.text?.includes("Strict custom harness instructions."),
+  );
 } finally {
   globalThis.fetch = savedFetch;
   if (savedPrewarm === undefined) delete process.env.ANTIGRAVITY_NO_PREWARM;
